@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智选A股 · 全市场选股与回测</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8b45b'/%3E%3Cpath d='M16 44l10-14 8 8 14-20' stroke='%230a0e17' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">智</div>
+      <div class="brand-text">
+        <h1>智选A股</h1>
+        <p>A-SHARE SELECTOR</p>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-view="overview"><i>◈</i><span>市场总览</span></button>
+      <button class="nav-item" data-view="picks"><i>✦</i><span>今日推荐</span></button>
+      <button class="nav-item" data-view="screener"><i>◎</i><span>智能选股</span></button>
+      <button class="nav-item" data-view="limitup"><i>⚡</i><span>涨停板</span></button>
+      <button class="nav-item" data-view="backtest"><i>◔</i><span>策略回测</span></button>
+      <button class="nav-item" data-view="watchlist"><i>★</i><span>我的自选</span></button>
+      <button class="nav-item" data-view="data"><i>⛁</i><span>数据管理</span></button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">连接中…</span></div>
+      <div class="muted">数据源：新浪财经 · 本地缓存</div>
+      <div class="muted">仅供研究学习，不构成投资建议</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="index-strip" id="index-strip"></div>
+      <div class="top-actions">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="global-search" placeholder="代码 / 名称" autocomplete="off">
+          <div class="search-drop hidden" id="search-drop"></div>
+        </div>
+        <button id="btn-refresh" class="btn ghost sm" title="刷新实时行情">刷新行情</button>
+      </div>
+    </header>
+
+    <div class="views">
+
+      <!-- 市场总览 -->
+      <section id="view-overview" class="view active">
+        <div class="view-head">
+          <div>
+            <h2>市场总览</h2>
+            <p class="sub" id="ov-sub">正在加载行情…</p>
+          </div>
+          <div class="head-actions">
+            <span class="chip" id="ov-date">—</span>
+          </div>
+        </div>
+
+        <div class="grid-6" id="ov-indices"></div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h3>涨跌分布</h3><span class="muted" id="ov-breadth"></span></div>
+            <div id="chart-dist" class="chart-sm"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>行业涨幅 TOP 10</h3><span class="muted">按成分股平均涨跌幅</span></div>
+            <div id="chart-industry" class="chart-sm"></div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-head"><h3>涨幅榜</h3><span class="muted">TOP 10</span></div>
+            <table class="mini-table" id="tbl-gainers"></table>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>跌幅榜</h3><span class="muted">TOP 10</span></div>
+            <table class="mini-table" id="tbl-losers"></table>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>成交额榜</h3><span class="muted">TOP 10</span></div>
+            <table class="mini-table" id="tbl-actives"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 今日推荐 -->
+      <section id="view-picks" class="view">
+        <div class="view-head">
+          <div>
+            <h2>今日推荐</h2>
+            <p class="sub">结合市场温度、资金与技术形态，给出今日关注方向</p>
+          </div>
+          <div class="head-actions">
+            <span class="chip" id="picks-date">—</span>
+            <button id="btn-picks-refresh" class="btn ghost sm">重新计算</button>
+          </div>
+        </div>
+
+        <div class="regime-card">
+          <div class="regime-badge neutral" id="regime-badge">—</div>
+          <div class="regime-main">
+            <div class="regime-title">市场温度：<b id="regime-label">分析中</b></div>
+            <p id="regime-advice" class="muted">正在分析全市场涨跌与资金分布…</p>
+            <div class="regime-stats" id="regime-stats"></div>
+          </div>
+        </div>
+
+        <div class="card pool-card">
+          <div class="card-head">
+            <h3>昨日涨停复盘</h3>
+            <span class="muted" id="pool-date">—</span>
+          </div>
+          <div class="pool-stats" id="pool-stats"></div>
+          <div class="pool-leaders" id="pool-leaders"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h3>推荐策略</h3><span class="muted">点击直接运行</span></div>
+            <div class="strategy-row" id="picks-strategies"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>强势行业</h3><span class="muted">按成分股平均涨幅</span></div>
+            <div class="strategy-row" id="picks-industries"></div>
+          </div>
+        </div>
+
+        <div class="section-title"><h3>昨日涨停 · 接力候选</h3><span class="muted" id="picks-pool-note"></span></div>
+        <div class="picks-grid" id="picks-grid"></div>
+
+        <div class="section-title"><h3>全市场精选</h3><span class="muted" id="picks-general-note"></span></div>
+        <div class="picks-grid" id="picks-grid2"></div>
+
+        <div class="card picks-help">
+          <div class="card-head"><h3>推荐逻辑</h3></div>
+          <p class="muted">推荐分两部分：①「昨日涨停 · 接力候选」6 只，按连板高度与封板形态从昨日涨停池中挑选，高位连板会标注风险；②「全市场精选」6 只，从全市场按趋势、位置、量能、动量、估值多因子补齐，涨停板块内的标的额外加分。每个行业最多保留 2–3 只。结果仅供研究参考，不构成投资建议。</p>
+        </div>
+      </section>
+
+      <!-- 智能选股 -->
+      <section id="view-screener" class="view">
+        <div class="view-head">
+          <div>
+            <h2>智能选股</h2>
+            <p class="sub">组合行情、估值与技术形态，从全市场筛选机会</p>
+          </div>
+          <div class="head-actions">
+            <button id="btn-reset" class="btn ghost sm">重置</button>
+            <button id="btn-export" class="btn ghost sm">导出 CSV</button>
+            <button id="btn-run-screen" class="btn primary">开始选股</button>
+          </div>
+        </div>
+
+        <div class="preset-row" id="preset-row"></div>
+
+        <div class="screener-body">
+          <aside class="card cond-panel">
+            <div class="cond-head">
+              <h3>筛选条件</h3>
+              <span class="muted" id="cond-count">0 条</span>
+            </div>
+            <div id="cond-list" class="cond-list"></div>
+            <button id="btn-add-cond" class="btn dashed">＋ 添加条件</button>
+
+            <div class="panel-block">
+              <h4>股票池</h4>
+              <div class="board-checks" id="board-checks"></div>
+              <label class="switch"><input type="checkbox" id="excl-st" checked><span>排除 ST / 退市</span></label>
+              <label class="switch"><input type="checkbox" id="excl-new" checked><span>排除次新股（60 日内）</span></label>
+              <label class="switch"><input type="checkbox" id="excl-sus" checked><span>排除停牌</span></label>
+            </div>
+
+            <div class="panel-block">
+              <h4>结果</h4>
+              <label class="field-row"><span>排序</span>
+                <select id="sort-by">
+                  <option value="score">综合评分</option>
+                  <option value="pct">涨跌幅</option>
+                  <option value="turnover">换手率</option>
+                  <option value="amount">成交额</option>
+                  <option value="pct_60d">60日涨幅</option>
+                  <option value="mktcap">总市值</option>
+                  <option value="pe">市盈率</option>
+                </select>
+              </label>
+              <label class="field-row"><span>数量</span>
+                <select id="result-limit">
+                  <option value="50">50 只</option>
+                  <option value="100" selected>100 只</option>
+                  <option value="200">200 只</option>
+                  <option value="500">500 只</option>
+                </select>
+              </label>
+            </div>
+          </aside>
+
+          <div class="card results">
+            <div class="result-head">
+              <div><strong id="res-count">—</strong><span class="muted" id="res-meta"></span></div>
+              <div class="muted" id="res-time"></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" id="tbl-screen">
+                <thead>
+                  <tr>
+                    <th data-key="score">评分</th>
+                    <th>代码 / 名称</th>
+                    <th data-key="price" class="num">现价</th>
+                    <th data-key="pct" class="num">涨跌幅</th>
+                    <th data-key="turnover" class="num">换手</th>
+                    <th data-key="volume_ratio" class="num">量比</th>
+                    <th data-key="amount" class="num">成交额</th>
+                    <th data-key="mktcap" class="num">总市值</th>
+                    <th data-key="pe" class="num">PE</th>
+                    <th data-key="pct_60d" class="num">60日</th>
+                    <th>信号</th>
+                    <th class="num">操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="empty hidden" id="screen-empty">
+              <div class="empty-icon">◎</div>
+              <p>设置条件后点击「开始选股」</p>
+              <p class="muted">或从上方选择一个策略模板</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 涨停板 -->
+      <section id="view-limitup" class="view">
+        <div class="view-head">
+          <div>
+            <h2>涨停板</h2>
+            <p class="sub">涨停 / 跌停复盘：连板高度、一字板与量能形态</p>
+          </div>
+          <div class="head-actions">
+            <div class="segmented" id="limitup-toggle">
+              <button data-kind="up" class="active">涨停</button>
+              <button data-kind="down">跌停</button>
+            </div>
+            <span class="chip" id="limitup-date">—</span>
+          </div>
+        </div>
+
+        <div class="grid-4" id="limitup-stats"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3 id="limitup-title">涨停股</h3>
+            <span class="muted" id="limitup-meta">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="tbl-limitup">
+              <thead>
+                <tr>
+                  <th>代码 / 名称</th>
+                  <th class="num">现价</th>
+                  <th class="num">涨幅</th>
+                  <th class="num">连板</th>
+                  <th>形态</th>
+                  <th>类型</th>
+                  <th class="num">换手</th>
+                  <th class="num">成交额</th>
+                  <th class="num">流通市值</th>
+                  <th>行业</th>
+                  <th class="num">操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty hidden" id="limitup-empty">
+            <div class="empty-icon">⚡</div>
+            <p>当前没有符合条件的股票</p>
+            <p class="muted">收盘后刷新行情即可看到当日涨停/跌停</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 策略回测 -->
+      <section id="view-backtest" class="view">
+        <div class="view-head">
+          <div>
+            <h2>策略回测</h2>
+            <p class="sub">用历史数据检验选股策略的真实表现</p>
+          </div>
+        </div>
+
+        <div class="backtest-layout">
+          <aside class="card bt-form">
+            <label class="field-col"><span>策略</span>
+              <select id="bt-preset"></select>
+            </label>
+            <p class="bt-desc muted" id="bt-desc"></p>
+            <div class="grid-2 tight">
+              <label class="field-col"><span>开始</span><input type="date" id="bt-start"></label>
+              <label class="field-col"><span>结束</span><input type="date" id="bt-end"></label>
+            </div>
+            <div class="grid-2 tight">
+              <label class="field-col"><span>持有天数</span>
+                <select id="bt-hold">
+                  <option value="3">3 天</option>
+                  <option value="5" selected>5 天</option>
+                  <option value="10">10 天</option>
+                  <option value="20">20 天</option>
+                </select>
+              </label>
+              <label class="field-col"><span>持仓数</span>
+                <select id="bt-slots">
+                  <option value="5">5 只</option>
+                  <option value="10" selected>10 只</option>
+                  <option value="20">20 只</option>
+                </select>
+              </label>
+            </div>
+            <label class="field-col"><span>初始资金（元）</span><input id="bt-capital" type="number" value="1000000" step="100000"></label>
+            <button id="btn-run-bt" class="btn primary block">运行回测</button>
+            <p class="hint">信号于收盘产生，次日开盘买入；持有到期后开盘卖出。等权分配，含佣金与印花税。</p>
+          </aside>
+
+          <div class="bt-result" id="bt-result">
+            <div class="empty" id="bt-empty">
+              <div class="empty-icon">◔</div>
+              <p>选择策略与参数，开始回测</p>
+              <p class="muted">默认近一年、持有 5 天、10 只等权</p>
+            </div>
+            <div class="bt-body hidden" id="bt-body">
+              <div class="stat-grid" id="bt-stats"></div>
+              <div class="card">
+                <div class="card-head"><h3>收益曲线</h3><span class="muted" id="bt-range"></span></div>
+                <div id="chart-equity" class="chart-lg"></div>
+              </div>
+              <div class="grid-2">
+                <div class="card">
+                  <div class="card-head"><h3>回撤</h3><span class="muted" id="bt-dd-max"></span></div>
+                  <div id="chart-dd" class="chart-sm"></div>
+                </div>
+                <div class="card">
+                  <div class="card-head"><h3>策略概要</h3></div>
+                  <div id="bt-summary" class="kv-list"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3>交易记录</h3><span class="muted" id="bt-trade-note"></span></div>
+                <div class="table-wrap short">
+                  <table class="data-table" id="tbl-trades">
+                    <thead><tr><th>代码 / 名称</th><th>买入</th><th>卖出</th><th class="num">买入价</th><th class="num">卖出价</th><th class="num">收益</th><th class="num">评分</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="warn-box hidden" id="bt-warn"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 自选 -->
+      <section id="view-watchlist" class="view">
+        <div class="view-head">
+          <div><h2>我的自选</h2><p class="sub">关注标的实时表现</p></div>
+          <div class="head-actions"><span class="chip" id="wl-ts">—</span></div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="data-table" id="tbl-watch">
+              <thead><tr><th>代码 / 名称</th><th class="num">现价</th><th class="num">涨跌幅</th><th class="num">换手</th><th class="num">成交额</th><th class="num">总市值</th><th class="num">PE</th><th class="num">60日</th><th class="num">操作</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty hidden" id="wl-empty">
+            <div class="empty-icon">★</div>
+            <p>还没有自选股</p>
+            <p class="muted">在选股结果或个股详情中点击星标即可加入</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 数据管理 -->
+      <section id="view-data" class="view">
+        <div class="view-head">
+          <div><h2>数据管理</h2><p class="sub">本地行情缓存与同步状态</p></div>
+          <div class="head-actions">
+            <button id="btn-sync" class="btn primary">增量更新</button>
+            <button id="btn-sync-full" class="btn ghost">全量重建</button>
+          </div>
+        </div>
+
+        <div class="grid-4" id="data-stats"></div>
+
+        <div class="card sync-card">
+          <div class="card-head"><h3>同步进度</h3><span class="muted" id="sync-phase">空闲</span></div>
+          <div class="progress"><div class="bar" id="sync-bar"></div></div>
+          <div class="sync-meta">
+            <span id="sync-msg">—</span>
+            <span id="sync-pct">0%</span>
+          </div>
+          <div class="sync-log" id="sync-log"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h3>说明</h3></div>
+            <ul class="notes">
+              <li>首次使用请点击「全量重建」，约需 3–4 分钟，将抓取全市场日线与技术指标。</li>
+              <li>之后每次启动或点击「增量更新」约需 3 分钟，会刷新全部日线与指标。</li>
+              <li>行情来自新浪财经公开接口，日线最多 900 个交易日。</li>
+              <li>日线为不复权价格，程序会按涨跌幅上限识别送转并做近似前复权。</li>
+              <li>数据保存在本地 <code>data/ashare.db</code>，不会上传任何信息。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>数据库</h3></div>
+            <div id="db-info" class="kv-list"></div>
+            <div class="danger-row">
+              <button id="btn-vacuum" class="btn ghost sm">整理数据库</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- 个股抽屉 -->
+<div class="drawer-mask hidden" id="drawer-mask"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 id="d-name">—</h3>
+      <p class="muted"><span id="d-code">—</span><span id="d-board"></span></p>
+    </div>
+    <button class="icon-btn" id="d-close" aria-label="关闭">✕</button>
+  </div>
+  <div class="d-price" id="d-price"></div>
+  <div class="d-stats" id="d-stats"></div>
+  <div class="card d-chart-card">
+    <div id="d-chart" class="d-chart"></div>
+  </div>
+  <div class="card d-chart-card">
+    <div id="d-chart2" class="d-chart-sm"></div>
+  </div>
+  <div class="d-concepts muted" id="d-concepts"></div>
+  <div class="d-actions">
+    <button id="d-watch" class="btn ghost">☆ 加入自选</button>
+    <button id="d-backtest" class="btn ghost">去策略回测</button>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script src="/vendor/echarts.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
