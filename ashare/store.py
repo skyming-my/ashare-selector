@@ -18,6 +18,7 @@ _initialized = False
 
 # date(YYYYMMDD), open, high, low, close, volume(手), amount(亿元), turnover(%), pct(%)
 _BAR = struct.Struct("<I8f")
+BAR_SIZE = _BAR.size
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS stocks(
@@ -100,6 +101,29 @@ def conn():
         c.close()
 
 
+def bulk_connect():
+    """大批量写入专用连接：关闭自动 checkpoint，避免每批都触发随机写。"""
+    init()
+    c = sqlite3.connect(config.DB_PATH, timeout=60)
+    c.row_factory = sqlite3.Row
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA synchronous=NORMAL")
+    c.execute("PRAGMA busy_timeout=60000")
+    c.execute("PRAGMA wal_autocheckpoint=0")
+    return c
+
+
+def bulk_close(c):
+    try:
+        c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+    try:
+        c.close()
+    except Exception:
+        pass
+
+
 def query(sql, args=(), one=False):
     with conn() as c:
         cur = c.execute(sql, args)
@@ -159,6 +183,16 @@ class BulkWriter:
         now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         payload = [(code, date, n, json.dumps(data, ensure_ascii=False), now)
                    for code, date, n, data in items]
+        self.c.executemany(
+            "INSERT INTO tech(code,date,bars,data,updated_at) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(code) DO UPDATE SET date=excluded.date, bars=excluded.bars, "
+            "data=excluded.data, updated_at=excluded.updated_at", payload)
+        self.c.commit()
+
+    def tech_raw(self, payload):
+        """写入已序列化好的指标元组 (code, date, n, json, updated_at)。"""
+        if not payload:
+            return
         self.c.executemany(
             "INSERT INTO tech(code,date,bars,data,updated_at) VALUES(?,?,?,?,?) "
             "ON CONFLICT(code) DO UPDATE SET date=excluded.date, bars=excluded.bars, "
@@ -287,6 +321,16 @@ def get_bars_many(codes, start=None):
                 bars = [b for b in bars if b["date"] >= start]
             out[r["code"]] = bars
     return out
+
+
+def get_bars_tail(code, n=320):
+    """只解包最近 n 根日线，返回 (bars, 总根数)。"""
+    row = query("SELECT n, data FROM bars WHERE code=?", (code,), one=True)
+    if not row:
+        return [], 0
+    total = row["n"] or 0
+    cnt = min(n, total)
+    return unpack_bars(row["data"][-cnt * BAR_SIZE:]), total
 
 
 def save_index_bars(secid, bars):

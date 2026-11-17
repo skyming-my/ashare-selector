@@ -7,6 +7,7 @@ import datetime as dt
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from . import net
 
@@ -134,27 +135,71 @@ def fetch_all_spot(progress=None):
         total = int(json.loads(net.fetch(SINA_COUNT, timeout=15, retries=3).decode("utf-8")).strip('"'))
     except Exception:
         total = None
+
     out = []
     seen = set()
-    page = 1
-    while page <= 120:
-        rows = fetch_spot_page(page)
-        if not rows:
-            break
+
+    def add(rows):
         for r in rows:
             if r["code"] in seen:
                 continue
             seen.add(r["code"])
             out.append(r)
-        if progress:
-            progress(len(out), total or len(out))
-        if total and len(out) >= total:
-            break
-        if len(rows) < 100:
-            break
-        page += 1
-        time.sleep(0.03)
+
+    first = fetch_spot_page(1)
+    add(first)
+    if progress:
+        progress(len(out), total or len(out))
+
+    if total:
+        pages = (total + 99) // 100 + 1
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {pool.submit(fetch_spot_page, p): p for p in range(2, pages + 1)}
+            for fut in as_completed(futures):
+                page = futures[fut]
+                try:
+                    rows = fut.result()
+                except Exception:
+                    try:
+                        rows = fetch_spot_page(page)
+                    except Exception:
+                        rows = []
+                add(rows)
+                if progress:
+                    progress(len(out), total)
+    else:
+        # 总数未知时退回顺序翻页
+        page = 2
+        while page <= 120:
+            rows = fetch_spot_page(page)
+            if not rows:
+                break
+            add(rows)
+            if progress:
+                progress(len(out), len(out))
+            if len(rows) < 100:
+                break
+            page += 1
+            time.sleep(0.03)
     return out
+
+
+def fetch_index_quote(sym="sh000001"):
+    """指数快照，用于确认最近交易日与收盘时间。"""
+    raw = net.fetch("https://hq.sinajs.cn/list=" + sym, timeout=8, retries=2,
+                    headers={"Referer": "https://finance.sina.com.cn"})
+    text = raw.decode("gbk", "replace")
+    m = re.search(r'var hq_str_\w+="(.*)";', text)
+    if not m:
+        return None
+    parts = m.group(1).split(",")
+    if len(parts) < 32:
+        return None
+    return {
+        "price": _num(parts[3]),
+        "date": parts[30],
+        "time": parts[31],
+    }
 
 
 # ---------------- 日K线（腾讯，北交所回退新浪） ----------------

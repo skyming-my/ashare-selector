@@ -11,7 +11,7 @@ HOST = os.environ.get("ASHARE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ASHARE_PORT", "8765"))
 
 DEFAULT_YEARS = 2
-SYNC_WORKERS = 6
+SYNC_WORKERS = 12
 
 # 指数（腾讯证券代码）
 INDEXES = [
