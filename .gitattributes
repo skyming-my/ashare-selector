@@ -7,3 +7,5 @@
 *.html text eol=lf
 *.md text eol=lf
 *.png binary
+*.xz binary
+*.xz.part* binary

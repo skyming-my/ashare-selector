@@ -74,6 +74,8 @@ def init():
     with _init_lock:
         if _initialized:
             return
+        from . import dbseed
+        dbseed.ensure_database()
         os.makedirs(config.DATA_DIR, exist_ok=True)
         conn = sqlite3.connect(config.DB_PATH, timeout=30)
         try:
